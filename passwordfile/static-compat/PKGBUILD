@@ -1,0 +1,46 @@
+# Maintainer: Martchus <martchus@gmx.net>
+
+# All my PKGBUILDs are managed at https://github.com/Martchus/PKGBUILDs where
+# you also find the URL of a binary repository.
+
+_reponame=passwordfile
+pkgname=static-compat-passwordfile
+_name=${pkgname#static-compat-}
+pkgver=5.0.10
+pkgrel=1
+arch=('i686' 'x86_64' 'armv6h' 'armv7h' 'aarch64')
+pkgdesc='C++ library to read/write passwords from/to encrypted files using AES-256-CBC via OpenSSL'
+license=('GPL')
+depends=('static-compat-c++utilities' 'static-compat-openssl' 'static-compat-zlib')
+optdepends=("$_name-doc: API documentation")
+makedepends=('static-compat-cmake' 'ninja')
+checkdepends=('static-compat-cppunit')
+install=
+url="https://github.com/Martchus/${_reponame}"
+source=("${_name}-${pkgver}.tar.gz::https://github.com/Martchus/${_reponame}/archive/v${pkgver}.tar.gz")
+sha256sums=('7d4b8095c172ae48e19651ef561aa3b461b4f008fc1c4b378368532f4009a472')
+
+build() {
+  check_buildoption ccache y && ccache_args='
+    -DCMAKE_C_COMPILER_LAUNCHER=ccache
+    -DCMAKE_CXX_COMPILER_LAUNCHER=ccache'
+  source static-compat-environment
+  cd "$srcdir/${PROJECT_DIR_NAME:-$_reponame-$pkgver}"
+  static-compat-cmake \
+    -G Ninja \
+    -DCMAKE_BUILD_TYPE:STRING='Release' \
+    .
+  ninja
+}
+
+check() {
+  source static-compat-environment
+  cd "$srcdir/${PROJECT_DIR_NAME:-$_reponame-$pkgver}"
+  ninja check
+}
+
+package() {
+  source static-compat-environment
+  cd "$srcdir/${PROJECT_DIR_NAME:-$_reponame-$pkgver}"
+  DESTDIR="${pkgdir}" ninja install
+}

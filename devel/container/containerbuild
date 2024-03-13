@@ -1,0 +1,5 @@
+#!/bin/bash
+set -e
+export LOGDEST=$PWD SRCPKGDEST=$PWD SRCDEST=$PWD PKGDEST=$PWD BUILDDIR=/build
+export BUILDTOOL=makecontainerbuild BUILDTOOLVER="0.0.1"
+exec

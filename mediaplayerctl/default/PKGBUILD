@@ -1,0 +1,19 @@
+# Maintainer: Martchus <martchus@gmx.net>
+
+# All my PKGBUILDs are managed at https://github.com/Martchus/PKGBUILDs where
+# you also find the URL of a binary repository.
+
+pkgname=mediaplayerctl
+pkgver=1.0.1
+pkgrel=2
+pkgdesc='Bash script to control media player applications using qdbus'
+arch=('any')
+license=('GPL')
+depends=('qt5-tools')
+makedepends=()
+source=("${_reponame}-${pkgver}.tar.gz::https://github.com/Martchus/${pkgname}/archive/v${pkgver}.tar.gz")
+sha256sums=('38c61355d095affa93098948f23b129a7287c2b6d739a1565285b07cf6b8b692')
+
+package() {
+  install -Dm755 "${srcdir}/${PROJECT_DIR_NAME:-$pkgname-$pkgver}/${pkgname}.sh" "${pkgdir}/usr/bin/${pkgname}"
+}

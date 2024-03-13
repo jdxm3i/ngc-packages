@@ -1,0 +1,102 @@
+# Maintainer: Martchus <martchus@gmx.net>
+
+# All my PKGBUILDs are managed at https://github.com/Martchus/PKGBUILDs where
+# you also find the URL of a binary repository.
+
+_reponame=repoindex
+pkgname=(repoindex{,-header,-web,-gui})
+_name=${pkgname%-git}
+pkgver=0.2.6
+pkgrel=1
+arch=('i686' 'x86_64')
+pkgdesc='Repository browser for Arch Linux'
+license=('GPL')
+depends=('qt5-base' 'qt5-websockets' 'karchive' 'pacman' 'c++utilities-git')
+makedepends=('cmake' 'ninja' 'git' 'yuicompressor' 'qtutilities-git')
+backup=("etc/${_reponame}.conf")
+#provides=("${_name}")
+#conflicts=("${_name}")
+url="https://github.com/Martchus/${_reponame}"
+options=(emptydirs)
+source=("${_reponame}::${MARTCHUS_GIT_URL_PREFIX:-git+https://github.com/Martchus}/${_reponame}.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "${srcdir}/${pkgname}"
+  echo "$(git rev-list --count HEAD).$(git rev-parse --short HEAD)"
+}
+
+build() {
+  cd "$srcdir/${PROJECT_DIR_NAME:-$_reponame}"
+  cmake \
+    -G Ninja \
+    -DCMAKE_BUILD_TYPE:STRING='Release' \
+    -DCMAKE_INSTALL_PREFIX:PATH='/usr' \
+    -DCONFIGURATION_NAME:STRING='git' \
+    -DCONFIGURATION_PACKAGE_SUFFIX:STRING='-git' \
+    -DCONFIGURATION_TARGET_SUFFIX:STRING='git' \
+    -DBUILD_SHARED_LIBS:BOOL=ON \
+    .
+  ninja
+}
+
+package_repoindex() {
+  pkgdesc="Repository browser for Arch Linux (provides server binary, git version)."
+  depends=('qt5-base' 'qt5-websockets' 'karchive' 'c++utilities-git')
+  optdepends=('repoindex-header: header files')
+  optdepends=('repoindex-web: file for web UI')
+  optdepends=('repoindex-gui: application showing the web UI')
+
+  # install files
+  cd "$srcdir/${PROJECT_DIR_NAME:-$_reponame}"
+  DESTDIR="${pkgdir}" ninja install-binary install-service install-config install-bash-completion
+
+  # make directories for cache and data
+  mkdir -p "$pkgdir/var/cache/$_reponame"
+  chown http:http "$pkgdir/var/cache/$_reponame"
+  mkdir -p "$pkgdir/var/lib/$_reponame/sync"
+  chown http:http "$pkgdir/var/lib/$_reponame/"{,sync}
+  mkdir -p "$pkgdir/etc"
+  cp "$pkgdir/usr/share/$_reponame/skel/repoindex.conf.js" "$pkgdir/etc/repoindex.conf"
+}
+
+package_repoindex-header() {
+  arch=('any')
+  pkgdesc="Repository browser for Arch Linux (provides header files, git version)"
+  depends=('repoindex')
+  backup=()
+
+  # must call cmake again to adjust install prefix
+  cd "$srcdir/${PROJECT_DIR_NAME:-$_reponame}"
+  cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="/usr"
+
+  # install files
+  DESTDIR="${pkgdir}" ninja install-header
+}
+
+package_repoindex-web() {
+  arch=('any')
+  pkgdesc="Repository browser for Arch Linux (provides assets for web interface, git version)"
+  depends=('repoindex')
+  backup=()
+
+  # must call cmake again to adjust install prefix
+  cd "$srcdir/${PROJECT_DIR_NAME:-$_reponame}"
+  cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="/usr"
+
+  # install files
+  DESTDIR="${pkgdir}" ninja install-web
+}
+
+package_repoindex-gui() {
+  pkgdesc="Repository browser for Arch Linux (provides an desktop app showing the web UI, git version)"
+  depends=('repoindex-web' 'qt5-webengine')
+  backup=()
+
+  # must call cmake again to adjust install prefix
+  cd "$srcdir/${PROJECT_DIR_NAME:-$_reponame}"
+  cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="/usr"
+
+  # install files
+  DESTDIR="${pkgdir}" ninja install-binary-gui install-desktop
+}

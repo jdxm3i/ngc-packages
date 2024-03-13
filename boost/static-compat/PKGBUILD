@@ -1,0 +1,85 @@
+# Contributor: Evangelos Foutras <evangelos@foutrelis.com>
+# Contributor: Levente Polyak <anthraxx[at]archlinux[dot]org>
+# Contributor: Bartłomiej Piotrowski <bpiotrowski@archlinux.org>
+# Contributor: Marius Knaust <marius.knaust@gmail.com>
+# Contributor: Ionut Biru <ibiru@archlinux.org>
+# Contributor: Stéphane Gaudreault <stephane@archlinux.org>
+# Contributor: kevin <kevin@archlinux.org>
+# Contributor: Giovanni Scafora <giovanni@archlinux.org>
+# Contributor: Kritoke <kritoke@gamebox.net>
+# Contributor: Luca Roccia <little_rock@users.sourceforge.net>
+
+_pkgname=boost
+pkgname=static-compat-$_pkgname
+pkgver=1.81.0
+pkgrel=1
+_srcname=boost_${pkgver//./_}
+pkgdesc="Free peer-reviewed portable C++ source libraries"
+arch=('x86_64')
+url="https://www.boost.org/"
+license=('custom')
+options=('staticlibs')
+depends=('static-compat-zlib' 'static-compat-zstd' 'static-compat-bzip2')
+makedepends=('static-compat-environment')
+source=(https://boostorg.jfrog.io/artifactory/main/release/$pkgver/source/$_srcname.tar.bz2
+        boost-1.81.0-phoenix-multiple-definitions.patch
+        $_pkgname-ublas-c++20-iterator.patch::https://github.com/boostorg/ublas/commit/a31e5cffa85f.patch)
+sha256sums=('71feeed900fbccca04a3b4f2f84a7c217186f28a940ed8b7ed4725986baf99fa'
+            '3ebf428ef6be090a7b56a233330375539ac429333b83708e28fe5db049cfecdb'
+            'aa38addb40d5f44b4a8472029b475e7e6aef1c460509eb7d8edf03491dc1b5ee')
+
+prepare() {
+  cd $_srcname
+
+  # https://github.com/boostorg/phoenix/issues/111
+  patch -Np1 -i ../boost-1.81.0-phoenix-multiple-definitions.patch
+
+  # https://github.com/boostorg/ublas/pull/97
+  patch -Np2 -i ../$_pkgname-ublas-c++20-iterator.patch
+}
+
+build() {
+  source static-compat-environment
+  local JOBS="$(sed 's/.*\(-j *[0-9]\+\).*/\1/' <<<$MAKEFLAGS)"
+
+  pushd $_srcname/tools/build
+  ./bootstrap.sh --cxxflags="$CXXFLAGS $LDFLAGS"
+  ./b2 install --prefix="$srcdir"/fakeinstall
+  ln -s b2 "$srcdir"/fakeinstall/bin/bjam
+  popd
+
+  cd $_srcname
+  ./bootstrap.sh --with-toolset=gcc
+
+  # boostbook is needed by quickbook
+  install -dm755 "$srcdir"/fakeinstall/share/boostbook
+  cp -a tools/boostbook/{xsl,dtd} "$srcdir"/fakeinstall/share/boostbook/
+
+  # install to $srcdir/fakeinstall in preparation for split packaging
+  ./b2 install \
+    variant=release \
+    debug-symbols=off \
+    threading=multi \
+    runtime-link=static \
+    link=static \
+    toolset=gcc \
+    --without-python --without-mpi --without-graph_parallel \
+    cflags="$CPPFLAGS $CFLAGS -fPIC -O3 -ffat-lto-objects" \
+    cxxflags="$CPPFLAGS $CXXFLAGS -fPIC -O3 -ffat-lto-objects" \
+    linkflags="$LDFLAGS" \
+    --layout=system \
+    $JOBS \
+    \
+    --prefix="$srcdir"/fakeinstall
+}
+
+package() {
+  source static-compat-environment
+
+  install -d "$pkgdir/$static_compat_prefix"/lib
+  cp -a fakeinstall/lib/*.a "$pkgdir/$static_compat_prefix"/lib/
+  cp -a fakeinstall/lib/cmake "$pkgdir/$static_compat_prefix"/lib/
+  cp -a fakeinstall/{bin,include} "$pkgdir/$static_compat_prefix"/
+
+  install -Dm644 -t "$pkgdir/usr/share/licenses/$pkgname" $_srcname/LICENSE_1_0.txt
+}

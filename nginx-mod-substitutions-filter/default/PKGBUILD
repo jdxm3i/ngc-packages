@@ -1,0 +1,44 @@
+# $Id$
+# Maintainer: Martchus <martchus@gmx.net>
+
+pkgname=nginx-mod-substitutions-filter
+pkgver=0.6.4.115.e12e965
+pkgrel=2
+_dirname="$pkgname"
+_nginxver=1.24.0 # FIXME: fix build against NGINX 1.20.0
+
+pkgdesc='NGINX filter module which can do both regular expression and fixed string substitutions'
+arch=('x86_64')
+depends=("nginx=$_nginxver")
+makedepends=("nginx-src" "git")
+url='https://github.com/yaoweibin/ngx_http_substitutions_filter_module'
+license=('BSD')
+
+source=("$pkgname::git+https://github.com/yaoweibin/ngx_http_substitutions_filter_module.git#commit=${pkgver##*.}")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$srcdir/$_dirname"
+  echo '
+  if [ "$ngx_module_link" = DYNAMIC ] ; then
+      ngx_module_type=HTTP
+      ngx_module_name=ngx_http_subs_filter_module
+      ngx_module_srcs="$ngx_addon_dir/ngx_http_subs_filter_module.c"
+      . auto/module
+  fi' >> config
+}
+
+build() {
+  cp -r /usr/src/nginx .
+  cd "$srcdir"/nginx
+  ./configure --with-compat --add-dynamic-module="../$_dirname"
+  make modules
+}
+
+package() {
+  install -Dm755 "$srcdir/$_dirname/README" "$pkgdir/usr/share/licenses/${pkgname}/LICENSE" # license is part of the README
+  cd "$srcdir"/nginx/objs
+  for mod in ngx_*.so; do
+    install -Dm755 $mod "$pkgdir"/usr/lib/nginx/modules/$mod
+  done
+}

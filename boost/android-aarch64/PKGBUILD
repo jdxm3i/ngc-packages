@@ -1,0 +1,155 @@
+# Maintainer: Martchus <martchus@gmx.net>
+
+# All my PKGBUILDs are managed at https://github.com/Martchus/PKGBUILDs where
+# you also find the URL of a binary repository.
+
+_pkgname=boost
+_pkg_arch=aarch64
+_android_arch=arm64-v8a
+_boost_arch=arm
+_boost_address_model=64
+
+pkgname=android-$_pkg_arch-$_pkgname
+pkgver=1.81.0
+_srcname=boost_${pkgver//./_}
+pkgrel=1
+url='https://www.boost.org/'
+arch=('any')
+license=('custom')
+pkgdesc="Free peer-reviewed portable C++ source libraries (Android, $_pkg_arch)"
+depends=("android-$_pkg_arch-libiconv")
+options=(!buildflags staticlibs !strip !emptydirs)
+makedepends=('bzip2' 'zlib' 'android-ndk' 'android-sdk' 'android-environment')
+conflicts=("android-$_pkgname-$_android_arch")
+replaces=("android-$_pkgname-$_android_arch")
+source=(https://boostorg.jfrog.io/artifactory/main/release/$pkgver/source/$_srcname.tar.gz
+        boost-1.81.0-phoenix-multiple-definitions.patch
+        $_pkgname-ublas-c++20-iterator.patch::https://github.com/boostorg/ublas/commit/a31e5cffa85f.patch
+        no-versioned-shlibs.patch
+        disable-version-check.patch)
+sha256sums=('205666dea9f6a7cfed87c7a6dfbeb52a2c1b9de55712c9c1a87735d7181452b6'
+            '3ebf428ef6be090a7b56a233330375539ac429333b83708e28fe5db049cfecdb'
+            'aa38addb40d5f44b4a8472029b475e7e6aef1c460509eb7d8edf03491dc1b5ee'
+            'd82d0f15064812dcabb3456a7bcb1db0e0f6145980e4728e638372e0fd35af23'
+            '63d12e7d703b471882608b4225c489f6a35ab425602783a4f9c4ea99a10f9c4b')
+
+prepare() {
+  cd ${_srcname}
+  # https://github.com/boostorg/phoenix/issues/111
+  patch -Np1 -i ../boost-1.81.0-phoenix-multiple-definitions.patch
+
+  # https://github.com/boostorg/ublas/pull/97
+  patch -Np2 -i ../$_pkgname-ublas-c++20-iterator.patch
+
+  patch -i ../no-versioned-shlibs.patch
+  patch -p1 -i ../disable-version-check.patch
+}
+
+build() {
+  source android-env ${_pkg_arch}
+
+  local _stagedir="${srcdir}/stagedir"
+  local jobs="$(sed -e 's/.*\(-j *[0-9]\+\).*/\1/' <<< ${MAKEFLAGS})"
+  local target_flags=" \
+    --target=${_pkg_arch}-linux-android$ANDROID_MINIMUM_PLATFORM --sysroot=$ANDROID_SYSROOT"
+  local common_flags=" \
+    $target_flags \
+    -fexceptions \
+    -DANDROID \
+    -O3 -DNDEBUG \
+    -D_FORTIFY_SOURCE=2 -O2 -pipe -fno-plt -fexceptions --param=ssp-buffer-size=4 -fPIC \
+    -DBOOST_ASIO_HAS_STD_STRING_VIEW=1"
+  local ld_flags=" \
+    $target_flags \
+    -fexceptions"
+
+  cd ${_srcname}
+
+  msg2 'Bootstrapping b2'
+  ./bootstrap.sh --with-toolset=gcc
+
+  install -Dm755 tools/build/src/engine/b2 "${_stagedir}"/bin/b2
+
+  # Support for OpenMPI
+  echo "using mpi ;" >> project-config.jam
+
+  # boostbook is needed by quickbook
+  install -dm755 "${_stagedir}"/share/boostbook
+  cp -a tools/boostbook/{xsl,dtd} "${_stagedir}"/share/boostbook/
+
+  # default "minimal" install: "release link=shared,static
+  # runtime-link=shared threading=single,multi"
+  # --layout=tagged will add the "-mt" suffix for multithreaded libraries
+  # and installs includes in $ANDROID_PREFIX/include/boost.
+  # --layout=system no longer adds the -mt suffix for multi-threaded libs.
+  # install to ${_stagedir} for consistency with regular boost package
+  msg2 'Invoking build via b2'
+  export PATH=$ANDROID_CROSS_PREFIX:$PATH
+  "${_stagedir}"/bin/b2 \
+    --with-atomic \
+    --with-chrono \
+    --with-container \
+    --with-date_time \
+    --with-exception \
+    --with-fiber \
+    --with-filesystem \
+    --with-graph \
+    --with-graph_parallel \
+    --with-iostreams \
+    --with-locale \
+    --with-log \
+    --with-math \
+    --with-mpi \
+    --with-program_options \
+    --with-random \
+    --with-regex \
+    --with-serialization \
+    --with-system \
+    --with-test \
+    --with-thread \
+    --with-timer \
+    --with-type_erasure \
+    --with-wave \
+    --with-stacktrace \
+    variant=release \
+    debug-symbols=off \
+    threading=multi \
+    runtime-link=shared \
+    link=shared,static \
+    target-os=android \
+    toolset=clang-android \
+    architecture=$_boost_arch \
+    address-model=$_boost_address_model \
+    -sICONV_PATH="$ANDROID_PREFIX" \
+    cflags="$common_flags" \
+    cxxflags="$common_flags -frtti -std=gnu++17" \
+    linkflags="$ld_flags" \
+    --layout=system \
+    ${jobs} \
+    \
+    --prefix="${_stagedir}" \
+    install
+}
+
+package() {
+  source android-env ${_pkg_arch}
+
+  local _stagedir="${srcdir}/stagedir"
+  install -dm755 "${pkgdir}$ANDROID_PREFIX"
+  cp -a "${_stagedir}"/{include,share} "${pkgdir}$ANDROID_PREFIX"
+
+  local libdir="${pkgdir}$ANDROID_PREFIX"/lib
+  install -d "${libdir}"
+  cp -a "${_stagedir}"/lib/*.a "${libdir}"/
+
+  install -dm755 "${pkgdir}$ANDROID_PREFIX"
+  cp -a "${_stagedir}"/lib "${pkgdir}$ANDROID_PREFIX"
+
+  install -Dm644 "${srcdir}/"${_srcname}/LICENSE_1_0.txt \
+      "${pkgdir}"/usr/share/licenses/$pkgname/LICENSE_1_0.txt
+
+  find "${libdir}" -iname '*.a' -exec $ANDROID_STRIP -g {} \;
+  find "${libdir}" -iname '*.so' -exec $ANDROID_STRIP --strip-unneeded {} \;
+}
+
+# vim: ts=2 sw=2 et:

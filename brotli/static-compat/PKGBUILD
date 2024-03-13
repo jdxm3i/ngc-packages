@@ -1,0 +1,47 @@
+# Contributor: Felix Yan <felixonmars@archlinux.org>
+# Contributor: Levente Polyak <anthraxx[at]archlinux[dot]org>
+# Contributor: Lex Black <autumn-wind at web dot de>
+# Contributor: TingPing <tingping@tingping.se>
+# Contributor: Guillaume Horel <guillaume.horel@gmail.com>
+
+pkgname=static-compat-brotli
+_gitcommit=ed738e842d2fbdf2d6459e39267a633c4a9b2f5d
+pkgver=1.1.0
+pkgrel=2
+pkgdesc='Generic-purpose lossless compression algorithm'
+url='https://github.com/google/brotli'
+arch=('x86_64')
+license=('MIT')
+depends=('gcc-libs-static-compat')
+makedepends=('static-compat-cmake' 'git')
+options=('staticlibs')
+source=(${pkgname}::"git+${url}#commit=${_gitcommit}")
+sha512sums=('SKIP')
+
+pkgver() {
+  cd ${pkgbase}
+  git describe --tags --match 'v*' | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g'
+}
+
+build() {
+  source static-compat-environment
+  cd ${pkgbase}
+  static-compat-cmake -B build \
+    -DCMAKE_BUILD_TYPE=Release
+  cmake --build build -v
+}
+
+check() {
+  source static-compat-environment
+  cd ${pkgbase}
+  cd build
+  ctest --output-on-failure --stop-on-failure -j$(nproc)
+}
+
+package() {
+  source static-compat-environment
+  cd ${pkgbase}
+  DESTDIR="$pkgdir" cmake --install build
+  find "$pkgdir/$static_compat_prefix" -iname '*.so*' -delete
+  install -Dm 644 LICENSE -t "$pkgdir/usr/share/licenses/$pkgname"
+}

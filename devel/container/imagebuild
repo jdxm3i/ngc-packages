@@ -1,0 +1,5 @@
+#!/bin/bash
+set -e
+bindir=$(dirname "$0")
+${CRE:-docker} image pull archlinux
+${CRE:-docker} image build --no-cache --tag "${CRE_IMAGE:-archlinux-base-devel}" "$bindir/base-devel"

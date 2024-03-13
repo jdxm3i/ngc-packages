@@ -1,0 +1,45 @@
+# Contributor: Jan Alexander Steffens (heftig) <jan.steffens@gmail.com>
+# Contributor: Andreas Radke <andyrtr@archlinux.org>
+
+_pkgname=libwacom
+pkgname=static-compat-$_pkgname
+pkgver=2.6.0
+pkgrel=1
+pkgdesc="Library to identify Wacom tablets and their features"
+arch=('x86_64')
+url="https://github.com/linuxwacom/libwacom/wiki"
+license=('MIT')
+depends=('static-compat-glib2' 'static-compat-systemd-libs' 'static-compat-libgudev')
+makedepends=('static-compat-libxml2' 'static-compat-meson')
+checkdepends=('python-pytest' 'python-libevdev' 'python-pyudev')
+options=('staticlibs')
+source=(https://github.com/linuxwacom/libwacom/releases/download/${_pkgname}-${pkgver}/${_pkgname}-${pkgver}.tar.xz{,.sig})
+# https://github.com/linuxwacom/libwacom/releases
+sha256sums=('2376cca99475235b75053a2cfbc7ed40fd8763d5a516941a664870ff1f3aa98f'
+             'SKIP')
+validpgpkeys=('3C2C43D9447D5938EF4551EBE23B7E70B467F0BF') # "Peter Hutterer (Who-T) <office@who-t.net>"
+#validpgpkeys=('594ABBA066118C7A02D10A80A8AF906D9307FBAD') # "Joshua Dickens <Joshua@Joshua-Dickens.com>"
+
+prepare() {
+  sed -i 's|shared_library|library|g' $_pkgname-$pkgver/meson.build
+}
+
+build() {
+  export LDFLAGS+=' -llzma -lz -lm -lrt'
+  source static-compat-environment
+  static-compat-meson build $_pkgname-$pkgver
+  ninja -C build
+}
+
+check() {
+  source static-compat-environment
+  ninja test -C build
+}
+
+package() {
+  source static-compat-environment
+  DESTDIR="$pkgdir" ninja install -C build
+  install -D -m644 $_pkgname-$pkgver/COPYING "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+  find "$pkgdir/$static_compat_prefix" -iname '*.so*' -delete
+  rm -r "$pkgdir/$static_compat_prefix"/share/man
+}

@@ -1,0 +1,70 @@
+# Contributor: Pierre Schmitz <pierre@archlinux.de>
+
+_pkgname=openssl
+pkgname=static-compat-$_pkgname
+_ver=3.2.1
+# use a pacman compatible version scheme
+pkgver=${_ver/[a-z]/.${_ver//[0-9.]/}}
+pkgrel=1
+pkgdesc='The Open Source toolkit for Secure Sockets Layer and Transport Layer Security'
+arch=('x86_64')
+url='https://www.openssl.org'
+license=('Apache-2.0')
+depends=('glibc-static-compat')
+makedepends=('perl' 'static-compat-environment')
+optdepends=('ca-certificates')
+options=(!emptydirs staticlibs)
+source=("https://www.openssl.org/source/${_pkgname}-${_ver}.tar.gz"{,.asc}
+	'ca-dir.patch')
+sha256sums=('83c7329fe52c850677d75e5d0b0ca245309b97e8ecbcfdc1dfdc4ab9fac35b39'
+            'SKIP'
+            '0a32d9ca68e8d985ce0bfef6a4c20b46675e06178cc2d0bf6d91bd6865d648b7')
+validpgpkeys=('8657ABB260F056B1E5190839D9C4D26D0E604491'
+              '7953AC1FBC3DC8B3B292393ED5E9E43F7DF9EE8C'
+              'A21FAB74B0088AA361152586B8EF1A6BA9DA2D5C'
+              'EFC0A467D613CB83C7ED6D30D894E2CE8B3D79F5')
+
+prepare() {
+	cd "$srcdir/$_pkgname-$_ver"
+
+	# set ca dir to /etc/ssl by default
+	patch -Np1 -i "$srcdir/ca-dir.patch"
+}
+
+build() {
+	source static-compat-environment
+	cd "$srcdir/$_pkgname-$_ver"
+
+	# mark stack as non-executable: http://bugs.archlinux.org/task/12434
+	./Configure --prefix="$static_compat_prefix" --openssldir=/etc/ssl --libdir=lib \
+		no-shared no-ssl3-method enable-ec_nistp_64_gcc_128 linux-x86_64 \
+		"-Wa,--noexecstack ${CPPFLAGS} ${CFLAGS} ${LDFLAGS}"
+
+	make depend
+	make
+}
+
+check() {
+	source static-compat-environment
+	cd "$srcdir/$_pkgname-$_ver"
+
+	# the test fails due to missing write permissions in /etc/ssl
+	# revert this patch for make test
+	patch -Rp1 -i "$srcdir/ca-dir.patch"
+
+	make test
+
+	patch -Np1 -i "$srcdir/ca-dir.patch"
+	# re-run make to re-generate CA.pl from th patched .in file.
+	make apps/CA.pl
+}
+
+package() {
+	source static-compat-environment
+	cd "$srcdir/$_pkgname-$_ver"
+
+	make DESTDIR="$pkgdir" install_sw
+	rm -r "$pkgdir/$static_compat_prefix"/bin
+
+	install -D -m644 LICENSE.txt "$pkgdir/usr/share/licenses/$pkgname/LICENSE.txt"
+}

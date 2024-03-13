@@ -1,0 +1,36 @@
+# Contributor: AndyRTR <andyrtr@archlinux.org>
+# Contributor: Jan de Groot <jgc@archlinux.org>
+# Contributor: Alexander Baldeck <alexander@archlinux.org>
+
+_pkgname=libice
+pkgname=static-compat-$_pkgname
+pkgver=1.1.1
+pkgrel=1
+pkgdesc="X11 Inter-Client Exchange library"
+arch=('x86_64')
+url="https://xorg.freedesktop.org/"
+depends=('glibc-static-compat')
+makedepends=('static-compat-configure' 'static-compat-xtrans' 'xorg-util-macros' 'static-compat-xorgproto')
+options=(!emptydirs staticlibs)
+source=(${url}/releases/individual/lib/libICE-${pkgver}.tar.xz{,.sig})
+license=('custom')
+sha512sums=('2f7833a25f31cc743ca95cb88f9a8403b50e19ffb5bf43bfef87ba405857d359789daaa9ec2391351237d958f16d35dbf082adb76d301e46d3a54162a6b452d3'
+            'SKIP')
+#validpgpkeys=('4A193C06D35E7C670FA4EF0BA2FB9E081F2D130E') # "Alan Coopersmith <alan.coopersmith@oracle.com>"
+validpgpkeys=('3BB639E56F861FA2E86505690FDD682D974CA72A') # Matt Turner <mattst88@gmail.com>
+
+build() {
+  source static-compat-environment
+  cd libICE-${pkgver}
+  static-compat-configure --disable-shared --enable-static --sysconfdir=/etc
+  make
+}
+
+package() {
+  source static-compat-environment
+  cd libICE-${pkgver}
+  make DESTDIR="${pkgdir}" install
+  rm -r "$pkgdir/$static_compat_prefix"/share/doc
+
+  install -Dm644 COPYING "${pkgdir}/usr/share/licenses/${pkgname}/COPYING"
+}

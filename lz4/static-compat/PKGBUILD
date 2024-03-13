@@ -1,0 +1,48 @@
+# Contributor: Sébastien Luttringer
+
+_pkgname=lz4
+pkgname=static-compat-$_pkgname
+epoch=1
+pkgver=1.9.4
+pkgrel=1
+pkgdesc='Extremely fast compression algorithm'
+arch=('x86_64')
+url='https://lz4.github.io/lz4/'
+license=('GPL2')
+makedepends=('git' 'static-compat-environment')
+depends=('glibc-static-compat')
+options=(!emptydirs staticlibs)
+source=("git+https://github.com/lz4/lz4.git#tag=v$pkgver")
+sha256sums=('SKIP')
+
+prepare() {
+  cd $_pkgname
+  # apply patch from the source array (should be a pacman feature)
+  local src
+  for src in "${source[@]}"; do
+    src="${src%%::*}"
+    src="${src##*/}"
+    [[ $src = *.patch ]] || continue
+    msg2 "Applying patch $src..."
+    patch -Np1 < "../$src"
+  done
+}
+
+build() {
+  source static-compat-environment
+  # do not use the main makefile, it calls sub make with -e
+  # exported CLFAGS by makepkg break the version. see FS#50071
+  cd $_pkgname
+  make -C lib PREFIX="$static_compat_prefix"
+}
+
+package() {
+  source static-compat-environment
+  cd $_pkgname
+  make install PREFIX="$static_compat_prefix" DESTDIR="$pkgdir"
+  rm -r "$pkgdir/$static_compat_prefix"/bin
+  rm -r "$pkgdir/$static_compat_prefix"/share/man
+  find "$pkgdir" -iname '*.so*' -delete
+}
+
+# vim:set ts=2 sw=2 et:

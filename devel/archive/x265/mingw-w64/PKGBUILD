@@ -1,0 +1,50 @@
+# Maintainer: Karl-Felix Glatzer <karl.glatzer@gmx.de>
+
+# This version includes the programs and enables Windows XP support
+# in contrast to the version found in the AUR.
+
+pkgname=mingw-w64-x265
+pkgver=2.3
+pkgrel=1
+pkgdesc='Open Source H265/HEVC video encoder (mingw-w64)'
+arch=('any')
+url='https://bitbucket.org/multicoreware/x265'
+license=('GPL')
+depends=('mingw-w64-crt')
+options=(!strip !buildflags staticlibs)
+makedepends=('mingw-w64-gcc' 'mingw-w64-cmake')
+source=("https://bitbucket.org/multicoreware/x265/downloads/x265_${pkgver}.tar.gz"
+        mingw.patch)
+sha256sums=('47520ac3424790168ea5c2db4a3cf12ca4d55a1790720007916652f07af3e41f'
+            '90b8e81cd5228d2b147fbd6c000921d5b7593819e378d0e73c11c8de390796bc')
+_architectures="i686-w64-mingw32 x86_64-w64-mingw32"
+
+prepare() {
+    cd "${srcdir}/x265_${pkgver}"
+    patch -Np1 -i "${srcdir}/mingw.patch"
+}
+
+build() {
+  for _arch in ${_architectures}; do
+    mkdir -p "${srcdir}"/build-${_arch} && cd "${srcdir}"/build-${_arch}
+    unset LDFLAGS CPPFLAGS
+    ${_arch}-cmake \
+       -DENABLE_SHARED='TRUE' \
+       -DENABLE_CLI='TRUE' \
+       -DWINXP_SUPPORT:BOOL='TRUE' \
+       "${srcdir}"/x265_${pkgver}/source
+    make
+  done
+}
+
+package() {
+  for _arch in ${_architectures}; do
+    cd "${srcdir}"/build-${_arch}
+    make DESTDIR="$pkgdir" install
+    ${_arch}-strip --strip-all "${pkgdir}"/usr/${_arch}/bin/*.exe
+    ${_arch}-strip --strip-unneeded "${pkgdir}"/usr/${_arch}/bin/*.dll
+    ${_arch}-strip -g "${pkgdir}"/usr/${_arch}/lib/*.a
+  done
+}
+
+# vim: ts=2 sw=2 et:

@@ -1,0 +1,38 @@
+# Contributor: Jan de Groot <jgc@archlinux.org>
+# Contributor: Andreas Radke <andyrtr@archlinux.org>
+
+_pkgname=xcb-util-keysyms
+pkgname=static-compat-$_pkgname
+pkgver=0.4.1
+pkgrel=4
+pkgdesc="Utility libraries for XC Binding - Standard X key constants and conversion to/from keycodes"
+arch=('x86_64')
+url="https://xcb.freedesktop.org"
+license=('custom')
+depends=('static-compat-libxcb>=1.7')
+makedepends=('xorg-util-macros' 'static-compat-xorgproto' 'static-compat-configure')
+options=(staticlibs)
+source=(https://xorg.freedesktop.org/archive/individual/lib/${_pkgname}-${pkgver}.tar.xz{,.sig})
+sha512sums=('dd53a36b52647f22bf0da8cded4b2974a51899eaac799797017ed8534f14bc2d2d339a14fa5ef387ae4528b7d9a5d31920bb0c71b09ca34f58e5081e768e2bbf'
+            'SKIP')
+validpgpkeys=('4A193C06D35E7C670FA4EF0BA2FB9E081F2D130E') # Alan Coopersmith <alan.coopersmith@oracle.com>
+
+build() {
+  source static-compat-environment
+  cd ${_pkgname}-${pkgver}
+  static-compat-configure --disable-shared --enable-static
+  make
+}
+
+check() {
+  source static-compat-environment
+  cd ${_pkgname}-${pkgver}
+  make check
+}
+
+package() { 
+  source static-compat-environment
+  cd ${_pkgname}-${pkgver}
+  make DESTDIR="${pkgdir}" install
+  install -Dm644 COPYING "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

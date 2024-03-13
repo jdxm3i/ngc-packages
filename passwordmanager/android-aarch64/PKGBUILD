@@ -1,0 +1,101 @@
+# Maintainer: Martchus <martchus@gmx.net>
+
+# All my PKGBUILDs are managed at https://github.com/Martchus/PKGBUILDs where
+# you also find the URL of a binary repository.
+
+_reponame=passwordmanager
+_pkgname=passwordmanager
+_android_arch=arm64-v8a
+_pkg_arch=aarch64
+_android_toolchain=$_pkg_arch-linux-android
+_android_platform=22
+_prefix=/opt/android-libs/$_pkg_arch
+
+pkgname=android-$_pkg_arch-$_pkgname
+pkgver=4.1.4
+pkgrel=1
+arch=('any')
+pkgdesc="A simple password store using AES-256-CBC encryption via OpenSSL (Android, $_pkg_arch)"
+license=('GPL')
+depends=()
+makedepends=("android-$_pkg_arch-passwordfile" "android-$_pkg_arch-qtutilities" "android-$_pkg_arch-kirigami2"
+             'cmake' 'ninja' 'android-ndk' 'android-sdk' 'android-platform' 'jdk8-openjdk' 'breeze-icons')
+conflicts=("android-$_pkgname-$_android_arch")
+replaces=("android-$_pkgname-$_android_arch")
+url="https://github.com/Martchus/${_reponame}"
+source=("${_pkgname}-${pkgver}.tar.gz::https://github.com/Martchus/${_reponame}/archive/v${pkgver}.tar.gz")
+sha256sums=('e6f6c929a52e6df03f2cfff689a0a2165ecca50d1477f49825b3d574fea2bfc6')
+options=(!buildflags staticlibs !strip !emptydirs)
+
+prepare() {
+  cd "$srcdir/${PROJECT_DIR_NAME:-$_reponame-$pkgver}"
+}
+
+build() {
+  cd "$srcdir/${PROJECT_DIR_NAME:-$_reponame-$pkgver}"
+
+  # locate keystore
+  local keystore_dir=${ANDROID_APK_KEYSTORE_DIR}
+  local keystore_alias=${ANDROID_APK_KEYSTORE_ALIAS}
+  local keystore_url=$keystore_dir/$keystore_alias
+  local keystore_password=${ANDROID_APK_KEYSTORE_PASSWORD}
+  if [[ ! -d $keystore_dir ]]; then
+    msg2 "The specified ANDROID_APK_KEYSTORE_DIR \"$keystore_dir\" is not a directory."
+  fi
+  if [[ -z $keystore_alias ]]; then
+    msg2 "The specified ANDROID_APK_KEYSTORE_ALIAS is empty."
+  fi
+  if [[ -z $keystore_password ]]; then
+    msg2 "The specified ANDROID_APK_KEYSTORE_PASSWORD is empty."
+  fi
+
+  # locate SDK, NDK and further libraries
+  local android_sdk_root=${ANDROID_SDK_ROOT:-/opt/android-sdk}
+  local android_ndk_root=${ANDROID_NDK_ROOT:-/opt/android-ndk}
+  local build_tools_version=$(pacman -Q android-sdk-build-tools | sed 's/.* r\(.*\)-.*/\1/')
+  local other_libs_root=/opt/android-libs/$_pkg_arch
+  local other_libs_include=$other_libs_root/include
+  local root="$android_ndk_root/sysroot;$other_libs_root"
+
+  # use Java 8 which seems to be the latest version which works
+  export PATH=/usr/lib/jvm/java-8-openjdk/jre/bin/:$PATH
+
+  mkdir -p build
+  cd build
+
+  cmake \
+    -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_SYSTEM_NAME=Android \
+    -DCMAKE_SYSTEM_VERSION=$_android_platform \
+    -DCMAKE_ANDROID_ARCH_ABI=$_android_arch \
+    -DCMAKE_ANDROID_NDK="$android_ndk_root" \
+    -DCMAKE_ANDROID_SDK="$android_sdk_root" \
+    -DCMAKE_ANDROID_STL_TYPE=c++_shared \
+    -DCMAKE_INSTALL_PREFIX=$other_libs_root \
+    -DCMAKE_PREFIX_PATH="$root" \
+    -DCMAKE_FIND_ROOT_PATH="$root;$root/libs" \
+    -DCLANG_FORMAT_ENABLED=ON \
+    -DUSE_NATIVE_FILE_BUFFER=ON \
+    -DNO_DOXYGEN=ON \
+    -DWIDGETS_GUI=OFF \
+    -DQUICK_GUI=ON \
+    -DBUILTIN_ICON_THEMES=breeze \
+    -DBUILTIN_TRANSLATIONS=ON \
+    -DANDROID_APK_KEYSTORE_URL="$keystore_url" \
+    -DANDROID_APK_KEYSTORE_ALIAS="$keystore_alias" \
+    -DANDROID_APK_KEYSTORE_PASSWORD="$keystore_password" \
+    -DANDROID_APK_CXX_STANDARD_LIBRARY="$android_ndk_root/sources/cxx-stl/llvm-libc++/libs/$_android_arch/libc++_shared.so" \
+    ..
+
+  ninja
+  DESTDIR="${pkgdir}" ninja passwordmanager_apk
+}
+
+package() {
+  cd "$srcdir/${PROJECT_DIR_NAME:-$_reponame-$pkgver}"
+
+  local apk_dir=${pkgdir}/$_prefix/apk/$_pkgname
+  mkdir -p "$apk_dir"
+  find build/apk -iname '*.apk' -exec cp --target-directory="$apk_dir" {} \;
+}

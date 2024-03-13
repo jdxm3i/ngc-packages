@@ -1,0 +1,40 @@
+# Contributor: Andreas Radke <andyrtr@archlinux.org>
+
+_pkgname=libevdev
+pkgname=static-compat-$_pkgname
+pkgver=1.13.0
+pkgrel=1
+pkgdesc="Wrapper library for evdev devices"
+arch=(x86_64)
+url="https://www.freedesktop.org/wiki/Software/libevdev/"
+license=(custom:MIT)
+depends=('glibc-static-compat')
+# 'static-compat-check'
+makedepends=('python' 'valgrind' 'doxygen' 'static-compat-meson')
+options=(staticlibs)
+source=(https://freedesktop.org/software/$_pkgname/$_pkgname-$pkgver.tar.xz{,.sig})
+sha512sums=('f30f14c44ef4d4829625aa4c28f10555f333905486f9d39c18cd3ca35e87128a0c24c1bc18ca37b6bf98bc8f7fad27e1bc68678a58e6e6fff3b8d99502ac6905'
+            'SKIP')
+validpgpkeys=('3C2C43D9447D5938EF4551EBE23B7E70B467F0BF') # Peter Hutterer (Who-T) <office@who-t.net>
+
+build() {
+  source static-compat-environment
+  static-compat-meson $_pkgname-$pkgver build \
+    -D documentation=disabled \
+    -D tests=disabled
+  meson compile -C build
+}
+
+#check() {
+#  source static-compat-environment
+#  meson test -C build
+#}
+
+package() {
+  source static-compat-environment
+  DESTDIR="$pkgdir" meson install -C build
+  rm -r "$pkgdir/$static_compat_prefix"/share/man
+
+  install -Dm644 $_pkgname-$pkgver/COPYING \
+    "${pkgdir}/usr/share/licenses/${pkgname}/COPYING"
+}

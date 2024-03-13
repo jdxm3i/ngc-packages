@@ -1,0 +1,26 @@
+_pkgbase=boost
+pkgname=boost-doc
+pkgver=1.81.0
+_srcname=boost_${pkgver//./_}
+pkgrel=1
+pkgdesc='Free peer-reviewed portable C++ source libraries (HTML documentation)'
+url='https://www.boost.org/'
+arch=('x86_64')
+license=('custom')
+makedepends=()
+source=(https://boostorg.jfrog.io/artifactory/main/release/$pkgver/source/$_srcname.tar.bz2)
+sha256sums=('71feeed900fbccca04a3b4f2f84a7c217186f28a940ed8b7ed4725986baf99fa')
+options=(!strip)
+
+package() {
+   cd ${_srcname}
+   local dest=$pkgdir/usr/share/$_pkgbase/doc
+
+   install -dm755 "$dest"
+   find \( \
+      -iname '*.htm' -o -iname '*.html' -o -iname '*.css' -o \
+      -iname '*.png' -o -iname '*.gif' -o -iname '*.jpg' -o -iname '*.js' \
+   \) -exec cp --target-directory="$dest" --parents --verbose {} +
+}
+
+# vim: ts=2 sw=2 et:
